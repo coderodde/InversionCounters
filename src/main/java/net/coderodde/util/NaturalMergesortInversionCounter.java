@@ -32,14 +32,80 @@ public final class NaturalMergesortInversionCounter {
                                             fromIndex,
                                             toIndex,
                                             comparator);
-        RunLengthQueue runLengthQueue = new
+        RunLengthQueue runLengthQueue = runLengthQueueBuilder.run();
         
-        T[] aux = Arrays.copyOfRange(array, fromIndex, toIndex);
+        T[] bufferArray = Arrays.copyOfRange(array, fromIndex, toIndex);
         T[] sourceArray;
         T[] targetArray;
         int sourceOffset;
         int targetOffset;
-        int mergePasses = getNumberOfMergePasses()
+        int mergePasses = getNumberOfMergePasses(runLengthQueue.size());
+        
+        if ((mergePasses & 1) == 1) {
+            // Odd amount of merge passes over the entire input array range.
+            // Set the buffer array as the source array so that the sorted 
+            // result ends in in the input array.
+            sourceArray = bufferArray;
+            targetArray = array;
+            sourceOffset = 0;
+            targetOffset = fromIndex;
+        } else {
+            sourceArray = array;
+            targetArray = bufferArray;
+            sourceOffset = fromIndex;
+            targetOffset = 0;
+        }
+        
+        int runsLeftInCurrentMergePass = runLengthQueue.size();
+        int offset = 0;
+        int inversions = 0;
+        
+        // While there are runs to merge, iterate:
+        while (runLengthQueue.size() > 1) {
+            int leftRunLength  = runLengthQueue.dequeue();
+            int rightRunLength = runLengthQueue.dequeue();
+            
+            inversions += merge(sourceArray,
+                                targetArray,
+                                sourceOffset + offset,
+                                targetOffset + offset,
+                                leftRunLength,
+                                rightRunLength,
+                                comparator);
+            
+            runLengthQueue.enqueue(leftRunLength + rightRunLength);
+            runsLeftInCurrentMergePass -= 2;
+            offset += leftRunLength + rightRunLength;
+            
+            switch (runsLeftInCurrentMergePass) {
+                case 1:
+                    int lastRunLength = runLengthQueue.dequeue();
+                    // In the target array, this 'unmarried' run might be
+                    // in the form of two unmerged runs.
+                    System.arraycopy(sourceArray,
+                                     sourceOffset + offset, 
+                                     targetArray,
+                                     targetOffset + offset,
+                                     lastRunLength);
+                    runLengthQueue.enqueue(lastRunLength);
+                    // FALL THROUGH!
+                    
+                case 0:
+                    runsLeftInCurrentMergePass = runLengthQueue.size();
+                    offset = 0;
+                    
+                    T[] tmpArray = sourceArray;
+                    sourceArray = targetArray;
+                    targetArray = tmpArray;
+                    
+                    int tmpOffset = sourceOffset;
+                    sourceOffset = targetOffset;
+                    targetOffset = tmpOffset;
+                    break;
+            }
+        }
+        
+        return 0;
     }
     
     /**
@@ -120,6 +186,11 @@ public final class NaturalMergesortInversionCounter {
             this.runLengthQueue = new RunLengthQueue((rangeLength >>> 1) + 1);
         }
         
+        /**
+         * Builds an entire run length queue over the input array range.
+         * 
+         * @return a run length queue.
+         */
         RunLengthQueue run() {
             while (left < last) {
                 head = left;
@@ -141,9 +212,24 @@ public final class NaturalMergesortInversionCounter {
             return runLengthQueue;
         }
         
+        // Adds a recently scanned run to the run queue. 
+        private void addRun() {
+            if (previousRunWasDescending) {
+                if (comparator.compare(inputArray[head - 1], 
+                                       inputArray[head]) <= 0) {
+                    runLengthQueue.extendLastRun(right - head);
+                } else {
+                    runLengthQueue.enqueue(right - head);
+                }
+            } else {
+                runLengthQueue.enqueue(right - head);
+            }
+        }
+        
+        // Scans an ascending run.
         private void scanAscendingRun() {
             while (left != last && comparator.compare(inputArray[left],
-                                                     inputArray[right]) <= 0) {
+                                                      inputArray[right]) <= 0) {
                 ++left;
                 ++right;
             }
@@ -152,8 +238,43 @@ public final class NaturalMergesortInversionCounter {
             previousRunWasDescending = false;
         }
         
+        // Scans a strictly descendign run. We require strictness in order to
+        // sort stably. If we were not, the reversal of a descending run would 
+        // reorder two possible adjacent array components.
         private void scanDescendingRun() {
-            while (left != last &&)
+            while (left != last && comparator.compare(inputArray[left],
+                                                      inputArray[right]) > 0) {
+                ++left;
+                ++right;
+            }
+            
+            reverseRun();
+            addRun();
+            previousRunWasDescending = true;
+        }
+        
+        /**
+         * Reverses the recently scanned (descending) run.
+         */
+        private void reverseRun() {
+            for (int i = head, j = left; i < j; i++, j--) {
+                T tmp = inputArray[i];
+                inputArray[i] = inputArray[j];
+                inputArray[j] = tmp;
+            }
+        }
+        
+        // Handles a possible leftover component.
+        private void handleLastElement() {
+            if (left == last) {
+                // Once here, we have a leftover component.
+                if (comparator.compare(inputArray[last - 1],
+                                       inputArray[last]) <= 0) {
+                    runLengthQueue.extendLastRun(1);
+                } else {
+                    runLengthQueue.enqueue(1);
+                }
+            }
         }
     }
     
@@ -208,6 +329,22 @@ public final class NaturalMergesortInversionCounter {
             this.storage = new int[capacity];
         }
         
+        @Override
+        public String toString() {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append('[');
+            String separator = "";
+            
+            for (int i = 0; i < size; ++i) {
+                stringBuilder.append(separator);
+                separator = ", ";
+                stringBuilder.append(storage[i]);
+            }
+            
+            stringBuilder.append(']');
+            return stringBuilder.toString();
+        }
+        
         /**
          * Enqueues a given run length to the tail of this queue.
          * 
@@ -232,6 +369,15 @@ public final class NaturalMergesortInversionCounter {
         }
         
         /**
+         * Extends the last run length in the queue by {@code length} units.
+         * 
+         * @param length the length of the extension.
+         */
+        void extendLastRun(int length) {
+            storage[(tail - 1) & mask] += length;
+        }
+        
+        /**
          * Returns the number of run lengths stored in this queue.
          * 
          * @return the number of run lengths.
@@ -252,5 +398,62 @@ public final class NaturalMergesortInversionCounter {
         }
     }
     
+    /**
+     * Computes the required number of merge passes needed to sort an input
+     * array range containing {@code runs} runs.
+     * 
+     * @param runs the number of runs in the input array range.
+     * @return the number of required merge passes.
+     */
+    private static int getNumberOfMergePasses(int runs) {
+        return 32 - Integer.numberOfLeadingZeros(runs - 1);
+    }
+    
+    private static <T> int merge(T[] sourceArray,
+                                 T[] targetArray,
+                                 int sourceOffset,
+                                 int targetOffset,
+                                 int leftRunLength,
+                                 int rightRunLength,
+                                 Comparator<? super T> comparator) {
+        int leftRunIndex = sourceOffset;
+        int rightRunIndex = leftRunIndex + leftRunLength;
+        int leftRunEndIndex = rightRunIndex;
+        int rightRunEndIndex = rightRunIndex + rightRunLength;
+        int targetIndex = targetOffset;
+        int inversions = 0;
+        
+        while (leftRunIndex != leftRunEndIndex 
+                && rightRunIndex != rightRunEndIndex) {
+            if (comparator.compare(sourceArray[rightRunIndex],
+                                   sourceArray[leftRunIndex]) <0) {
+                inversions += leftRunEndIndex - leftRunIndex;
+                targetArray[targetIndex++] = sourceArray[rightRunIndex++];
+            } else {
+                targetArray[targetIndex++] = sourceArray[leftRunIndex++];
+            }
+        }
+        
+        System.arraycopy(sourceArray,
+                         leftRunIndex,
+                         targetArray,
+                         targetIndex,
+                         leftRunEndIndex - leftRunIndex);
+        
+        System.arraycopy(sourceArray, 
+                         rightRunIndex,
+                         targetArray,
+                         targetIndex,
+                         rightRunEndIndex - rightRunIndex);
+        
+        return inversions;
+    }
+    
     private NaturalMergesortInversionCounter() {}
+    
+    public static void main(String[] args) {
+        Integer[] array = { 2, 5, 4, -1, 2, 3, 1, 0, 3 };
+        int inv = NaturalMergesortInversionCounter.count(array, 0, array.length, Integer::compareTo);
+        System.out.println(inv);
+    }
 }

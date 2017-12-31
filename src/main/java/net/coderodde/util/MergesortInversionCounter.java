@@ -104,7 +104,6 @@ public final class MergesortInversionCounter {
             }
         }
         
-//        inversions += leftRunEndIndex - leftRunIndex;
         System.arraycopy(sourceArray, 
                          leftRunIndex, 
                          targetArray,
