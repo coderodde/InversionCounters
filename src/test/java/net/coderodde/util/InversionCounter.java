@@ -11,7 +11,7 @@ import java.util.Comparator;
  */
 @FunctionalInterface
 public interface InversionCounter<T> {
-    
+
     public int count(T[] array, 
                      int fromIndex,
                      int toIndex, 

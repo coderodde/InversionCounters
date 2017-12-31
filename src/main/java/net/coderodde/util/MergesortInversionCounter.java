@@ -14,8 +14,8 @@ import static net.coderodde.util.Utils.checkIndices;
  * @version 1.6 (Dec 30, 2017)
  */
 public final class MergesortInversionCounter {
-    
-    
+
+
     public static <T> int count(T[] array, 
                                 int fromIndex, 
                                 int toIndex, 
@@ -23,15 +23,15 @@ public final class MergesortInversionCounter {
         Objects.requireNonNull(array);
         checkIndices(array.length, fromIndex, toIndex);
         int rangeLength = toIndex - fromIndex;
-        
+
         if (rangeLength < 2) {
             return 0;
         }
-        
+
         T[] aux = Arrays.copyOfRange(array, fromIndex, toIndex);
         return count(aux, array, 0, fromIndex, rangeLength, comparator);
     }
-    
+
     private static <T> int count(T[] sourceArray,
                                  T[] targetArray,
                                  int sourceOffset,
@@ -41,7 +41,7 @@ public final class MergesortInversionCounter {
         if (rangeLength < 2) {
             return 0;
         }
-        
+
         int halfRangeLength = rangeLength >>> 1;
         int inversions = count(targetArray,
                                sourceArray,
@@ -49,14 +49,14 @@ public final class MergesortInversionCounter {
                                sourceOffset,
                                halfRangeLength,
                                comparator);
-        
+
         inversions += count(targetArray,
                             sourceArray,
                             targetOffset + halfRangeLength,
                             sourceOffset + halfRangeLength,
                             rangeLength - halfRangeLength,
                             comparator);
-        
+
         return inversions + merge(sourceArray,
                                   targetArray,
                                   sourceOffset,
@@ -65,20 +65,20 @@ public final class MergesortInversionCounter {
                                   rangeLength - halfRangeLength,
                                   comparator);
     }
-    
+
     public static <T> int count(T[] array, int fromIndex, int toIndex) {
         return count(array, fromIndex, toIndex, NATURAL_ORDER);
     }
-    
+
     public static <T> int count(T[] array, Comparator<? super T> comparator) {
         Objects.requireNonNull(array);
         return count(array, 0, array.length);
     }
-    
+
     public static <T> int count(T[] array) {
         return count(array, NATURAL_ORDER);
     }
-    
+
     private static <T> int merge(T[] sourceArray,
                                  T[] targetArray,
                                  int sourceOffset,
@@ -92,7 +92,7 @@ public final class MergesortInversionCounter {
         int rightRunIndex    = sourceOffset + leftRunLength;
         int rightRunEndIndex = rightRunIndex + rightRunLength;
         int targetIndex      = targetOffset;
-        
+
         while (leftRunIndex < leftRunEndIndex 
                 && rightRunIndex < rightRunEndIndex) {
             if (comparator.compare(sourceArray[rightRunIndex], 
@@ -103,7 +103,7 @@ public final class MergesortInversionCounter {
                 targetArray[targetIndex++] = sourceArray[leftRunIndex++];
             }
         }
-        
+
         System.arraycopy(sourceArray, 
                          leftRunIndex, 
                          targetArray,
@@ -116,6 +116,6 @@ public final class MergesortInversionCounter {
                          rightRunEndIndex - rightRunIndex);
         return inversions;
     }
-    
+
     private MergesortInversionCounter() {}
 }

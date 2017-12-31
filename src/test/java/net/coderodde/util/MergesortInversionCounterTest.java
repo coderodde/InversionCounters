@@ -9,7 +9,7 @@ package net.coderodde.util;
  */
 public class MergesortInversionCounterTest 
         extends AbstractInversionCounterTest {
-    
+
     public MergesortInversionCounterTest() {
         super(MergesortInversionCounter::count);
     }
