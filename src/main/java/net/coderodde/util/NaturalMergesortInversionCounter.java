@@ -3,6 +3,7 @@ package net.coderodde.util;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
+import static net.coderodde.util.Utils.NATURAL_ORDER;
 import static net.coderodde.util.Utils.checkIndices;
 
 /**
@@ -13,6 +14,22 @@ import static net.coderodde.util.Utils.checkIndices;
  * @version 1.6 (Dec 30, 2017)
  */
 public final class NaturalMergesortInversionCounter {
+    
+    public static <T> int count(T[] array,
+                                int fromIndex,
+                                int toIndex) {
+        return count(array, fromIndex, toIndex, NATURAL_ORDER);
+    }
+    
+    public static <T> int count(T[] array) {
+        Objects.requireNonNull(array);
+        return count(array, 0, array.length);
+    }
+    
+    public static <T> int count(T[] array, Comparator<? super T> comparator) {
+        Objects.requireNonNull(array);
+        return count(array, 0, array.length, comparator);
+    }
     
     public static <T> int count(T[] array, 
                                 int fromIndex, 
@@ -105,7 +122,7 @@ public final class NaturalMergesortInversionCounter {
             }
         }
         
-        return 0;
+        return inversions;
     }
     
     /**
@@ -450,10 +467,4 @@ public final class NaturalMergesortInversionCounter {
     }
     
     private NaturalMergesortInversionCounter() {}
-    
-    public static void main(String[] args) {
-        Integer[] array = { 2, 5, 4, -1, 2, 3, 1, 0, 3 };
-        int inv = NaturalMergesortInversionCounter.count(array, 0, array.length, Integer::compareTo);
-        System.out.println(inv);
-    }
 }
