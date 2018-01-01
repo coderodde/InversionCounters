@@ -43,13 +43,12 @@ public final class NaturalMergesortInversionCounter {
         if (rangeLength < 2) {
             return 0;
         }
-
-        RunLengthQueueBuilder<T> runLengthQueueBuilder =
-                new RunLengthQueueBuilder<>(array,
-                                            fromIndex,
-                                            toIndex,
-                                            comparator);
-        RunLengthQueue runLengthQueue = runLengthQueueBuilder.run();
+        
+        RunLengthQueue runLengthQueue = 
+                buildRunLengthQueue(array, 
+                                    fromIndex, 
+                                    toIndex, 
+                                    comparator);
 
         T[] bufferArray = Arrays.copyOfRange(array, fromIndex, toIndex);
         T[] sourceArray;
@@ -125,174 +124,37 @@ public final class NaturalMergesortInversionCounter {
         return inversions;
     }
 
-    /**
-     * This static inner class implements an algorithm for scanning the input
-     * array range and constructing a run length queue.
-     * 
-     * @param <T> the array component type.
-     */
-    private static final class RunLengthQueueBuilder<T> {
+    static <T> RunLengthQueue 
+    buildRunLengthQueue(T[] inputArray, 
+                        int fromIndex,
+                        int toIndex,
+                        Comparator<? super T> comparator) {
+        int last = toIndex - 1;
+        int left = fromIndex;
+        int right = left + 1;
+        RunLengthQueue runLengthQueue =
+                new RunLengthQueue(toIndex - fromIndex);
+        while (left < last) {
+            int head = left;
 
-        /**
-         * The array holding the range to sort.
-         */
-        private final T[] inputArray;
-
-        /**
-         * The starting inclusive index into the array range to scan for runs.
-         */
-        private final int fromIndex;
-
-        /**
-         * The ending exclusive index into the array range to scan for runs.
-         */
-        private final int toIndex;
-
-        /**
-         * The array component comparator.
-         */
-        private final Comparator<? super T> comparator;
-
-        /**
-         * The index to the first array component belonging to the run currently
-         * being scanned.
-         */
-        private int head;
-
-        /**
-         * The smaller index into the array component pair currently scanned.
-         */
-        private int left;
-
-        /**
-         * The larger index into the array component pair currently scanned.
-         */
-        private int right;
-
-        /**
-         * The index (inclusive) of the very last array component in the input 
-         * array range.
-         */
-        private final int last;
-
-        /**
-         * Indicates whether the previous run was descending. We need this since
-         * after reversing a  descending run, it may turn out that this run may
-         * be simply extended by the following run.
-         */
-        private boolean previousRunWasDescending = false;
-
-        /**
-         * The run length queue being built.
-         */
-        private final RunLengthQueue runLengthQueue;
-
-        RunLengthQueueBuilder(T[] inputArray,
-                              int fromIndex,
-                              int toIndex,
-                              Comparator<? super T> comparator) {
-            this.inputArray = inputArray;
-            this.fromIndex = fromIndex;
-            this.toIndex = toIndex;
-            this.comparator = comparator;
-            this.left = fromIndex;
-            this.right = fromIndex + 1;
-            this.last = toIndex - 1;
-
-            int rangeLength = toIndex - fromIndex;
-            this.runLengthQueue = new RunLengthQueue((rangeLength >>> 1) + 1);
-        }
-
-        /**
-         * Builds an entire run length queue over the input array range.
-         * 
-         * @return a run length queue.
-         */
-        RunLengthQueue run() {
-            while (left < last) {
-                head = left;
-
-                if (comparator.compare(inputArray[left++],
-                                       inputArray[right++]) <= 0) {
-                    // The next run is ascending:
-                    scanAscendingRun();
-                } else {
-                    // The next run is descending:
-                    scanDescendingRun();
-                }
-
+            while (left < last 
+                    && comparator.compare(inputArray[left],
+                                          inputArray[right]) <= 0) {
                 ++left;
                 ++right;
             }
 
-            handleLastElement();
-            return runLengthQueue;
+            ++left;
+            ++right;
+
+            runLengthQueue.enqueue(left - head);
         }
 
-        // Adds a recently scanned run to the run queue. 
-        private void addRun() {
-            if (previousRunWasDescending) {
-                if (comparator.compare(inputArray[head - 1], 
-                                       inputArray[head]) <= 0) {
-                    runLengthQueue.extendLastRun(right - head);
-                } else {
-                    runLengthQueue.enqueue(right - head);
-                }
-            } else {
-                runLengthQueue.enqueue(right - head);
-            }
+        if (left == last) {
+            runLengthQueue.enqueue(1);
         }
 
-        // Scans an ascending run.
-        private void scanAscendingRun() {
-            while (left != last && comparator.compare(inputArray[left],
-                                                      inputArray[right]) <= 0) {
-                ++left;
-                ++right;
-            }
-
-            addRun();
-            previousRunWasDescending = false;
-        }
-
-        // Scans a strictly descendign run. We require strictness in order to
-        // sort stably. If we were not, the reversal of a descending run would 
-        // reorder two possible adjacent array components.
-        private void scanDescendingRun() {
-            while (left != last && comparator.compare(inputArray[left],
-                                                      inputArray[right]) > 0) {
-                ++left;
-                ++right;
-            }
-
-            reverseRun();
-            addRun();
-            previousRunWasDescending = true;
-        }
-
-        /**
-         * Reverses the recently scanned (descending) run.
-         */
-        private void reverseRun() {
-            for (int i = head, j = left; i < j; i++, j--) {
-                T tmp = inputArray[i];
-                inputArray[i] = inputArray[j];
-                inputArray[j] = tmp;
-            }
-        }
-
-        // Handles a possible leftover component.
-        private void handleLastElement() {
-            if (left == last) {
-                // Once here, we have a leftover component.
-                if (comparator.compare(inputArray[last - 1],
-                                       inputArray[last]) <= 0) {
-                    runLengthQueue.extendLastRun(1);
-                } else {
-                    runLengthQueue.enqueue(1);
-                }
-            }
-        }
+        return runLengthQueue;
     }
 
     /**
@@ -341,25 +203,9 @@ public final class NaturalMergesortInversionCounter {
          *                 constructor.
          */
         RunLengthQueue(int capacity) {
-            capacity = ceilPowerOfTwo(capacity);
+            capacity = ceilPowerOfTwo(Math.max(capacity, MINIMUM_CAPACITY));
             this.mask = capacity - 1;
             this.storage = new int[capacity];
-        }
-
-        @Override
-        public String toString() {
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append('[');
-            String separator = "";
-
-            for (int i = 0; i < size; ++i) {
-                stringBuilder.append(separator);
-                separator = ", ";
-                stringBuilder.append(storage[i]);
-            }
-
-            stringBuilder.append(']');
-            return stringBuilder.toString();
         }
 
         /**
@@ -383,15 +229,6 @@ public final class NaturalMergesortInversionCounter {
             head = (head + 1) & mask;
             size--;
             return ret;
-        }
-
-        /**
-         * Extends the last run length in the queue by {@code length} units.
-         * 
-         * @param length the length of the extension.
-         */
-        void extendLastRun(int length) {
-            storage[(tail - 1) & mask] += length;
         }
 
         /**

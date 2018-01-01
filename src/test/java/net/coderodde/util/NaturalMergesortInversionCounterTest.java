@@ -11,6 +11,6 @@ public class NaturalMergesortInversionCounterTest
         extends AbstractInversionCounterTest {
 
     public NaturalMergesortInversionCounterTest() {
-        super(MergesortInversionCounter::count);
+        super(NaturalMergesortInversionCounter::count);
     }
 }

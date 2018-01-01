@@ -26,7 +26,6 @@ public abstract class AbstractInversionCounterTest {
 
     @Test
     public void test() {
-        fail("fdsf");
         for (int iteration = 0; iteration < TEST_ITERATIONS; iteration++) {
             int length = random.nextInt(MAXIMUM_ARRAY_LENGTH + 1);
             int fromIndex = random.nextInt(Math.max(1, length / 10));
